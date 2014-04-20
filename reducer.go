@@ -164,7 +164,7 @@ func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
 
 func (p *Reducer) fetchAndReduce() (*TResult, error) {
 	stra := p.stragegy
-	stageWait := time.After(time.Millisecond * time.Duration(stra.Timeout))
+	timeout := time.After(time.Millisecond * time.Duration(stra.Timeout))
 	// maxWait := time.After(time.Millisecond * time.Duration(stra.Timeout*2))
 
 	if bss, ok := p.serverConf.Servers[stra.Copy]; ok {
@@ -185,7 +185,7 @@ func (p *Reducer) fetchAndReduce() (*TResult, error) {
 F:
 	for {
 		select {
-		case <-stageWait:
+		case <-timeout:
 			// log.Println("timeout")
 			break F // fail
 		case result = <-selectedCh:
