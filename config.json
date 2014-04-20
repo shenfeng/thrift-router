@@ -1,0 +1,29 @@
+{
+  "servers": {
+    "server1": ["localhost:9095", "localhost:9096"],
+    "server2": ["localhost:9095", "localhost:9096"],
+  },
+  "services": {
+    "getRecommendByDeal": [
+      {
+        "filter": {"stscene": 2, "b": 4},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "copy": "server1",
+            "traffic": 0.1,
+            "timeout": 60,
+            "models": ["server1","server2"],
+          },
+          {
+            "name": "strategy1",
+            "traffic": 0.05,
+            "timeout": 60
+            "models": ["server1"],
+          }
+       ]
+      }
+    ],
+  }
+}
