@@ -1,29 +1,178 @@
 {
   "servers": {
-    "server1": ["localhost:9095", "localhost:9096"],
-    "server2": ["localhost:9095", "localhost:9096"],
+    "job_search": [
+      {
+        "addr": "localhost:8401"
+      }
+    ],
+    "ac_server": [
+      {
+        "addr": "localhost:8913"
+      }
+    ]
   },
   "services": {
-    "getRecommendByDeal": [
+    "jobSearch": [
       {
-        "filter": {"stscene": 2, "b": 4},
+        "filter": {},
         "log": true,
         "strategies": [
           {
             "name": "strategy0",
-            "copy": "server1",
-            "traffic": 0.1,
-            "timeout": 60,
-            "models": ["server1","server2"],
-          },
-          {
-            "name": "strategy1",
-            "traffic": 0.05,
-            "timeout": 60
-            "models": ["server1"],
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 1,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
           }
-       ]
+        ]
       }
     ],
+    "companyJobs": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 102,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "mobileJobSearch": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "mobilePopular": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "getJobs": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "getJob": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "jobcount": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
+            ]
+          }
+        ]
+      }
+    ],
+    "autocomplete": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "ac_server",
+              "ac_server"
+            ]
+          }
+        ]
+      }
+    ],
+    "acnames": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "ac_server",
+              "ac_server"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

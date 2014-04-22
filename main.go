@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/binary"
+	// "encoding/binary"
 	"errors"
 	"flag"
 	// "fmt"
@@ -67,7 +67,7 @@ func (s *Server) getConf() *TCConfig {
 	return (*TCConfig)(atomic.LoadPointer(&s.conf))
 }
 
-func (s *Server) doReduce(request []byte, start time.Time) (r *Reducer, errr error) {
+func (s *Server) doReduce(request []byte, start time.Time) (*Reducer, error) {
 	iprot := thrift.NewTRBinaryProtocol(request[4:])
 	name, _, seqId, err := iprot.ReadMessageBegin()
 	if err != nil {
@@ -77,25 +77,24 @@ func (s *Server) doReduce(request []byte, start time.Time) (r *Reducer, errr err
 	conf := s.getConf()
 	if groups, ok := conf.Services[name]; ok {
 		hooker := NewHooker(name)
-		if request, obj, err := hooker.DecodeReq(s, request, seqId); err != nil {
+		if req, err := hooker.DecodeReq(s, request, seqId); err != nil {
 			return nil, err
 		} else {
-			r = &Reducer{
+			// log.Println(len(req.buffer))
+			r := &Reducer{
 				hooker:     hooker,
-				request:    request,
+				req:        req,
 				start:      start,
-				reqObj:     obj,
 				seqId:      seqId,
 				fname:      name,
 				server:     s,
 				serverConf: conf,
-				stragegy:   groups.Choose(obj, s),
+				stragegy:   groups.Choose(req, s),
 			}
-			if result, err := r.fetchAndReduce(); err == nil {
-				r.result = result
+			if err := r.fetchAndReduce(); err == nil {
 				return r, nil
 			} else {
-				return nil, err
+				return r, err
 			}
 		}
 	} else {
@@ -115,21 +114,6 @@ func (s *Server) checkDeadServers() {
 	}
 }
 
-func encode(r *Reducer) []byte {
-	t := r.result.data
-
-	oprot := thrift.NewTWBinaryProtocol(16 * 1024)
-	oprot.WriteMessageBegin(r.fname, thrift.REPLY, r.seqId)
-	t.Write(oprot)
-	oprot.WriteMessageEnd()
-	data := oprot.Bytes()
-
-	buffer := make([]byte, len(data)+4)
-	binary.BigEndian.PutUint32(buffer, uint32(len(data)))
-	copy(buffer[4:], data)
-	return buffer
-}
-
 func (s *Server) handle(c net.Conn) {
 	defer c.Close()
 	for {
@@ -141,20 +125,23 @@ func (s *Server) handle(c net.Conn) {
 			}
 			return
 		}
+
 		s.Hits.Add(1)
 		r, err := s.doReduce(message, start)
+
 		if err == nil {
-			buffer := encode(r)
-			writeAll(buffer, c)
+
+			// buffer := binaryProtocolEncode(r)
+			writeAll(r.result.bytes, c)
 			r.latency = time.Since(start)
 			s.Latencies[s.Hits.Get()%LatencySize] = r.latency
-			// if s.logfile != nil {
-			// 	r.hooker.Log(r, s.logfile)
-			// }
+
 		} else {
-			buffer := formatError(r.fname, r.seqId, thrift.UNKNOWN_APPLICATION_EXCEPTION, err)
-			writeAll(buffer, c)
-			s.Fails.Add(1)
+			if r != nil {
+				buffer := formatError(r.fname, r.seqId, thrift.UNKNOWN_APPLICATION_EXCEPTION, err)
+				writeAll(buffer, c)
+				s.Fails.Add(1)
+			}
 			return
 		}
 	}
@@ -186,8 +173,7 @@ func main() {
 	}
 
 	go server.checkDeadServers()
-
-	// go startHttpAdmin(server, httpAdmin)
+	go startHttpAdmin(server, httpAdmin)
 
 	for {
 		conn, err := ln.Accept()

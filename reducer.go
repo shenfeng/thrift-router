@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"thrift"
+	// "thrift"
 	"time"
 )
 
 type IHooker interface {
-	DecodeReq(s *Server, input []byte, seqid int32) ([]byte, TType, error)
-	Reduce(input []byte, prev TType, r *Reducer, stra *TStrategy) (bool, TType, error)
+	DecodeReq(s *Server, input []byte, seqid int32) (*TRequest, error)
+	Reduce(input []byte, prev TType, r *Reducer) (bool, TType, error)
 	// Encode(result TType, r *Reducer) []byte
 	Log(r *Reducer)
 }
@@ -66,22 +66,20 @@ func readFramedThrift(c net.Conn) ([]byte, error) {
 }
 
 type Reducer struct {
-	request []byte
-	reqObj  TType
-
+	req    *TRequest
 	result *TResult
 
 	failed     AtomicInt
-	conn       net.Conn
+	done       AtomicInt
 	seqId      int32
 	fname      string
+	conn       net.Conn
 	stragegy   *TStrategy
 	server     *Server
 	hooker     IHooker
 	start      time.Time
 	latency    time.Duration
 	serverConf *TCConfig
-	done       AtomicInt
 }
 
 func (p *Reducer) fetchFromBackend(b *Backend) (buffer []byte, err error) {
@@ -113,7 +111,7 @@ func (p *Reducer) fetchFromBackend(b *Backend) (buffer []byte, err error) {
 	}
 
 	client.SetDeadline(start.Add(time.Minute * 1))
-	if err = writeAll(p.request, client); err != nil {
+	if err = writeAll(p.req.bytes, client); err != nil {
 		return nil, err
 	}
 	buffer, err = readFramedThrift(client)
@@ -123,6 +121,13 @@ func (p *Reducer) fetchFromBackend(b *Backend) (buffer []byte, err error) {
 type TResult struct {
 	stragegy *TStrategy
 	data     TType
+	bytes    []byte
+}
+
+type TRequest struct {
+	bytes    []byte
+	obj      TType
+	cacheKey string
 }
 
 func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
@@ -137,12 +142,12 @@ func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
 			start := time.Now()
 			if msg, err := p.fetchFromBackend(b); err != nil {
 				log.Println("ERROR: fetch", b.Addr, err)
-			} else if done, r, err := p.hooker.Reduce(msg, partial, p, stragegy); err != nil {
+			} else if done, r, err := p.hooker.Reduce(msg, partial, p); err != nil {
 				log.Println("ERROR: reduce", b.Addr, err)
 			} else if done {
 				if p.done.Get() == 0 {
 					stragegy.Latencies[stragegy.Hits.Get()%LatencySize] = time.Since(start)
-					ch <- &TResult{stragegy: stragegy, data: r}
+					ch <- &TResult{stragegy: stragegy, data: r, bytes: binaryProtocolEncode(p, r)}
 				} else {
 					stragegy.Timeouts.Add(1)
 				}
@@ -162,10 +167,8 @@ func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
 	return ch
 }
 
-func (p *Reducer) fetchAndReduce() (*TResult, error) {
+func (p *Reducer) fetchAndReduce() error {
 	stra := p.stragegy
-	timeout := time.After(time.Millisecond * time.Duration(stra.Timeout))
-	// maxWait := time.After(time.Millisecond * time.Duration(stra.Timeout*2))
 
 	if bss, ok := p.serverConf.Servers[stra.Copy]; ok {
 		b := bss.nextOne(nil) // 复制线上真实流量到测试机器
@@ -176,6 +179,15 @@ func (p *Reducer) fetchAndReduce() (*TResult, error) {
 		}
 	}
 
+	stra.Hits.Add(1)
+	if stra.Cache != nil && stra.CacheTime > 0 {
+		if r, ok := stra.Cache.Get(p.req.cacheKey); ok {
+			p.result = &TResult{stragegy: stra, bytes: copyAndfixSeqId(r, p.seqId)}
+			return nil
+		}
+	}
+
+	timeout := time.After(time.Millisecond * time.Duration(stra.Timeout))
 	selectedRetry := 1
 
 	// var selectedCh chan *TResult
@@ -186,7 +198,6 @@ F:
 	for {
 		select {
 		case <-timeout:
-			// log.Println("timeout")
 			break F // fail
 		case result = <-selectedCh:
 			if result == nil {
@@ -203,21 +214,14 @@ F:
 	}
 
 	p.done.Set(1)
+	p.result = result
 	if result == nil {
-		return nil, errors.New("backend server failed")
+		return errors.New("backend server failed")
 	}
-	result.stragegy.Hits.Add(1)
-	return result, nil
-}
 
-func formatError(fname string, seqId, exceptionId int32, err error) []byte {
-	buffer := thrift.NewTMemoryBuffer()
-	trans := thrift.NewTFramedTransport(buffer)
-	oprot := thrift.NewTBinaryProtocolTransport(trans)
-	a := thrift.NewTApplicationException(exceptionId, err.Error())
-	oprot.WriteMessageBegin(fname, thrift.EXCEPTION, seqId)
-	a.Write(oprot)
-	oprot.WriteMessageEnd()
-	oprot.Flush()
-	return buffer.Bytes()
+	if stra.Cache != nil && stra.CacheTime > 0 {
+		stra.Cache.Setex(p.req.cacheKey, stra.CacheTime, result.bytes)
+	}
+
+	return nil
 }

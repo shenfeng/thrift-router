@@ -39,13 +39,16 @@ type TGroup struct {
 }
 
 type TStrategy struct {
-	Name    string   `json:"name"`
-	Traffic float32  `json:"traffic"`
-	Copy    string   `json:"copy"`
-	Models  []string `json:"models"`
-	Timeout int      `json:"timeout"`
-	Policy  string   `json:"policy"`
+	Name      string   `json:"name"`
+	Traffic   float32  `json:"traffic"`
+	Copy      string   `json:"copy"`
+	Models    []string `json:"models"`
+	Timeout   int      `json:"timeout"`
+	Policy    string   `json:"policy"`
+	CacheSize int      `json:"cache"`
 
+	Cache     *LRUCache
+	CacheTime int                        `json:"cachetime"`
 	Hits      AtomicInt                  `json:"hits"`
 	Partials  AtomicInt                  `json:"partials"`
 	Fails     AtomicInt                  `json:"fails"`
@@ -58,87 +61,14 @@ type TStrategies []*TStrategy
 type TService []*TGroup
 
 type TCConfig struct {
-	Servers map[string]TBackendServers
-	servers []string `json:"servers"`
-
-	Services map[string]TService `json:"services"`
+	Servers  map[string]TBackendServers `json:"servers"`
+	Services map[string]TService        `json:"services"`
 	loadTime time.Time
 }
 
-func (service TService) Choose(t TType, s *Server) *TStrategy {
-	// switch v := t.(type) {
-	// case *rec.DealRecReq:
-	// 	for _, g := range service {
-	// 		if g.Filter.matchDealReq(v, s) {
-	// 			r := rand.Float32()
-	// 			var current float32 = 0
-	// 			for _, stra := range g.Strategies {
-	// 				if stra.Traffic > 0.001 { //r use set this
-	// 					current += stra.Traffic
-	// 					if r < current {
-	// 						return stra
-	// 					}
-	// 				} else {
-	// 					return stra
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// 	// non match, choose the last one
-	// 	ss := service[len(service)-1].Strategies
-	// 	return ss[len(ss)-1]
-	// case *rec.User_Info: // getRecommendByUser
-	// 	return service[0].Strategies[0]
-	// case *rec.GetSuggestWithCountArgs: // get_suggest_with_count
-	// 	return service[0].Strategies[0]
-	// case *rec.GetPersonalGeoArgs:
-	// 	for _, g := range service {
-	// 		if g.Filter.matchGetPersonalGeoReq(v, s) {
-	// 			return g.Strategies[0]
-	// 		}
-	// 	}
-	// 	// can't reach here
-	// 	return service[0].Strategies[0]
-	// case *rec.SphSearchPoiArgs:
-	// 	for _, g := range service {
-	// 		if g.Filter.matchPoiSearchReq(v, s) {
-	// 			return g.Strategies[0]
-	// 		}
-	// 	}
-	// 	return service[0].Strategies[0]
-	// 	// for _, g := range service {
-	// 	// 	return g.Strategies[0]
-	// 	// }
-	// case *rec.GetDealRankArgs:
-	// 	for _, g := range service {
-	// 		if g.Filter.matchgetDealRankReq(v, s) {
-	// 			return g.Strategies[0]
-	// 		}
-	// 	}
-	// 	return service[0].Strategies[0]
-	// case *rec.GetRecommendBySearchArgs:
-	// 	return service[0].Strategies[0]
-	// case *rec.GenSearchExcerptArgs:
-	// 	// 搜索摘要服务
-	// 	return service[0].Strategies[0]
-	// case *rec.SphMultiSearchArgs:
-	// 	// 搜索服务
-	// 	for _, g := range service {
-	// 		if g.Filter.matchSphMultiSearchReq(v, s) {
-	// 			return g.Strategies[0]
-	// 		}
-	// 	}
-	// 	return service[0].Strategies[0]
-	// case *rec.SphSearchArgs:
-	// 	return service[0].Strategies[0]
-	// case *rec.SphSearchDealArgs:
-	// 	// mobile deal search
-	// 	return service[0].Strategies[0]
-	// case *rec.GetRecommendByPoiArgs:
-	// 	return service[0].Strategies[0]
-	// default:
-	// 	panic("not understand type")
-	// }
+func (service TService) Choose(req *TRequest, s *Server) *TStrategy {
+	// return
+	return service[0].Strategies[0]
 }
 
 func readConfigFromBytes(data []byte, dump bool) (*TCConfig, error) {
@@ -167,6 +97,9 @@ func readConfigFromBytes(data []byte, dump bool) (*TCConfig, error) {
 					return nil, fmt.Errorf("filter can not be nil")
 				}
 				for _, s := range g.Strategies {
+					if s.CacheSize > 0 {
+						s.Cache = NewCache(s.CacheSize)
+					}
 					for _, m := range s.Models {
 						if cfg.Servers[m] == nil {
 							return nil, fmt.Errorf("no server defined for '%v'", m)
@@ -242,19 +175,22 @@ func (s *Backend) markAsBroken() {
 }
 
 func (ss TBackendServers) nextOne(prev *Backend) *Backend {
-	var min int64 = 100000
-	idx := 0
-	i := rand.Intn(len(ss))
-	limit := i + len(ss)
 
-	for ; i < limit; i++ {
-		s := ss[i%len(ss)]
-		if s != prev && s.Dead.Get() == 0 && s.Ongoing.Get() < min {
-			min = s.Ongoing.Get()
-			idx = i % len(ss)
-		}
-	}
-	return ss[idx]
+	return ss[rand.Intn(len(ss))]
+
+	// var min int64 = 100000
+	// idx := 0
+	// i := rand.Intn(len(ss))
+	// limit := i + len(ss)
+
+	// for ; i < limit; i++ {
+	// 	s := ss[i%len(ss)]
+	// 	if s != prev && s.Dead.Get() == 0 && s.Ongoing.Get() < min {
+	// 		min = s.Ongoing.Get()
+	// 		idx = i % len(ss)
+	// 	}
+	// }
+	// return ss[idx]
 }
 
 func (s *Backend) reAlive() {
