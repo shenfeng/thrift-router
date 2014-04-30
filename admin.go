@@ -17,8 +17,20 @@ import (
 	"time"
 )
 
-var indexTmpl *template.Template
-var editorTmpl *template.Template
+var indexTmpl, editorTmpl *template.Template
+
+func init() {
+	var err error
+	if indexTmpl, err = template.ParseFiles("static/status.tpl"); err != nil {
+		panic("error loading and parseing static/status.tpl")
+	}
+
+	editorTmpl, err = template.ParseFiles("static/editor.tpl")
+	if err != nil {
+		panic("error loading and parseing static/editor.tpl")
+	}
+}
+
 
 func writeJson(w http.ResponseWriter, data interface{}) {
 	json, err := json.Marshal(data)
@@ -100,18 +112,12 @@ func servicesStatus(ss map[string]TService, conf *TCConfig) []map[string]interfa
 	for name, service := range ss {
 		for _, group := range service {
 			rets = append(rets, map[string]interface{}{
-				"name":       fmt.Sprintf("%s -- %s", name, group.Filter),
-				"strategies": strategiesStatus(group.Strategies, conf),
-			})
+					"name":       fmt.Sprintf("%s -- %s", name, group.Filter),
+					"strategies": strategiesStatus(group.Strategies, conf),
+				})
 		}
 	}
 	sort.Sort(rets)
-
-	// rets = append(rets, map[string]interface{}{
-	// 	"name":       "fallback"
-	// 	"strategies": []map[string]interface{}[strategyStatus()],
-	// })
-
 	return rets
 }
 
@@ -128,16 +134,16 @@ func backendServerStatus(ss map[string]TBackendServers, conf *TCConfig) []map[st
 	for model, backends := range ss {
 		for _, b := range backends {
 			rets = append(rets, map[string]interface{}{
-				"name":       fmt.Sprintf("name: %s, addr: %s", model, b.Addr),
-				"hits":       b.Hits.Get(),
-				"fails":      b.Fails.Get(),
-				"timeouts":   b.Timeouts.Get(),
-				"ongoing":    b.Ongoing.Get(),
-				"qps":        float64(b.Hits.Get()) / time.Since(conf.loadTime).Seconds(),
-				"dead":       b.Dead.Get() != 0,
-				"avgLatency": avgLatency(b.Latencies),
-				"latencies":  b.Latencies[:ReportLatencySize],
-			})
+					"name":       fmt.Sprintf("name: %s, addr: %s", model, b.Addr),
+					"hits":       b.Hits.Get(),
+					"fails":      b.Fails.Get(),
+					"timeouts":   b.Timeouts.Get(),
+					"ongoing":    b.Ongoing.Get(),
+					"qps":        float64(b.Hits.Get())/time.Since(conf.loadTime).Seconds(),
+					"dead":       b.Dead.Get() != 0,
+					"avgLatency": avgLatency(b.Latencies),
+					"latencies":  b.Latencies[:ReportLatencySize],
+				})
 		}
 	}
 	sort.Sort(rets)
@@ -145,14 +151,6 @@ func backendServerStatus(ss map[string]TBackendServers, conf *TCConfig) []map[st
 }
 
 func (p *Server) dumpStatusHtml(w http.ResponseWriter) {
-	if indexTmpl == nil {
-		var err error
-		if indexTmpl, err = template.ParseFiles("static/status.tpl"); err != nil {
-			fmt.Fprintf(w, "Parse static/status.tpl, error: %s", err)
-			return
-		}
-	}
-
 	now := time.Now()
 	f := func(n int64) string {
 		return fmt.Sprintf("%d, %.4f%%", n, float64(n)/float64(p.Hits.Get())*100.0)
@@ -164,7 +162,7 @@ func (p *Server) dumpStatusHtml(w http.ResponseWriter) {
 		"start":      p.Start,
 		"time":       now.Sub(p.Start),
 		"hits":       p.Hits.Get(),
-		"qps":        float64(p.Hits.Get()) / time.Since(p.Start).Seconds(),
+		"qps":        float64(p.Hits.Get())/time.Since(p.Start).Seconds(),
 		"fails":      f(p.Fails.Get()),
 		"latencies":  p.Latencies[:ReportLatencySize],
 		"avgLatency": avgLatency(p.Latencies),
@@ -174,16 +172,6 @@ func (p *Server) dumpStatusHtml(w http.ResponseWriter) {
 }
 
 func (p *Server) showEditor(w http.ResponseWriter) {
-	var err error
-	if editorTmpl == nil {
-		editorTmpl, err = template.ParseFiles("static/editor.tpl")
-	}
-
-	if editorTmpl == nil {
-		fmt.Fprintf(w, "Parse static/editor.tpl, error: %s", err)
-		return
-	}
-
 	data, _ := ioutil.ReadFile(p.conffile)
 	editorTmpl.Execute(w, map[string]string{
 		"config": string(data),
@@ -200,7 +188,8 @@ func (p *Server) saveConfig(w http.ResponseWriter, r *http.Request) {
 			y, m, d := now.Date()
 			h, min, s := now.Clock()
 
-			backup := fmt.Sprintf("%s_%d_%d_%d_%d_%d-%d", p.conffile, y, m, d, h, min, s)
+			backup := fmt.Sprintf("confs/conf_%d_%d_%d_%d_%d-%d.json", y, m, d, h, min, s)
+			os.Mkdir("confs", 0744);
 			if err := os.Rename(p.conffile, backup); err == nil {
 				if e := ioutil.WriteFile(p.conffile, []byte(config), 0666); e == nil {
 					log.Println("reload config")

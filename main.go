@@ -80,7 +80,6 @@ func (s *Server) doReduce(request []byte, start time.Time) (*Reducer, error) {
 		if req, err := hooker.DecodeReq(s, request, seqId); err != nil {
 			return nil, err
 		} else {
-			// log.Println(len(req.buffer))
 			r := &Reducer{
 				hooker:     hooker,
 				req:        req,
@@ -89,7 +88,7 @@ func (s *Server) doReduce(request []byte, start time.Time) (*Reducer, error) {
 				fname:      name,
 				server:     s,
 				serverConf: conf,
-				stragegy:   groups.Choose(req, s),
+				strategy:   groups.Choose(req, s),
 			}
 			if err := r.fetchAndReduce(); err == nil {
 				return r, nil
@@ -125,17 +124,13 @@ func (s *Server) handle(c net.Conn) {
 			}
 			return
 		}
-
 		s.Hits.Add(1)
+
 		r, err := s.doReduce(message, start)
-
 		if err == nil {
-
-			// buffer := binaryProtocolEncode(r)
 			writeAll(r.result.bytes, c)
 			r.latency = time.Since(start)
 			s.Latencies[s.Hits.Get()%LatencySize] = r.latency
-
 		} else {
 			if r != nil {
 				buffer := formatError(r.fname, r.seqId, thrift.UNKNOWN_APPLICATION_EXCEPTION, err)
@@ -148,10 +143,10 @@ func (s *Server) handle(c net.Conn) {
 }
 
 func main() {
-	var conf, addr, httpAdmin string
+	var conf, addr, httpadmin string
 	var test bool
 	flag.StringVar(&addr, "addr", "0.0.0.0:6666", "Which Addr the proxy listens")
-	flag.StringVar(&httpAdmin, "http", "0.0.0.0:6060", "HTTP admin addr")
+	flag.StringVar(&httpadmin, "http", "0.0.0.0:6060", "HTTP admin addr")
 	flag.StringVar(&conf, "conf", "config.json", "Config file path")
 	flag.BoolVar(&test, "test", false, "Test config file and exits")
 	flag.Parse()
@@ -173,7 +168,7 @@ func main() {
 	}
 
 	go server.checkDeadServers()
-	go startHttpAdmin(server, httpAdmin)
+	go startHttpAdmin(server, httpadmin)
 
 	for {
 		conn, err := ln.Accept()

@@ -105,6 +105,7 @@ struct JobSearchReq
         7: optional string uuid,
         8: optional string uid,
         9: optional i32 debug,
+        10: optional bool highlight = true,
 }
 
 struct PopularJobReq
@@ -172,6 +173,7 @@ struct Pinyins
 struct AcRespItem {
     1: required string item,
     3: required double score,
+    4: optional string highlighted;
 }
 
 struct AcResp
@@ -191,6 +193,7 @@ struct AcReq {
     6: optional i32 debug,
 
     7: optional i32 offset = 0,
+    8: optional bool highlight = true,
 }
 
 struct JobCountReq {

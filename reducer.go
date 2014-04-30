@@ -74,7 +74,7 @@ type Reducer struct {
 	seqId      int32
 	fname      string
 	conn       net.Conn
-	stragegy   *TStrategy
+	strategy   *TStrategy
 	server     *Server
 	hooker     IHooker
 	start      time.Time
@@ -119,7 +119,7 @@ func (p *Reducer) fetchFromBackend(b *Backend) (buffer []byte, err error) {
 }
 
 type TResult struct {
-	stragegy *TStrategy
+	strategy *TStrategy
 	data     TType
 	bytes    []byte
 }
@@ -130,11 +130,11 @@ type TRequest struct {
 	cacheKey string
 }
 
-func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
+func (p *Reducer) fetchFromBackends(strategy *TStrategy) chan *TResult {
 	ch := make(chan *TResult, 1)
 	go func() {
 		var partial TType
-		for _, server := range stragegy.Models {
+		for _, server := range strategy.Models {
 			b := p.serverConf.Servers[server].nextOne(nil)
 			if b.Dead.Get() != 0 { // ignore dead server
 				continue
@@ -146,10 +146,10 @@ func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
 				log.Println("ERROR: reduce", b.Addr, err)
 			} else if done {
 				if p.done.Get() == 0 {
-					stragegy.Latencies[stragegy.Hits.Get()%LatencySize] = time.Since(start)
-					ch <- &TResult{stragegy: stragegy, data: r, bytes: binaryProtocolEncode(p, r)}
+					strategy.Latencies[strategy.Hits.Get()%LatencySize] = time.Since(start)
+					ch <- &TResult{strategy: strategy, data: r, bytes: binaryProtocolEncode(p, r)}
 				} else {
-					stragegy.Timeouts.Add(1)
+					strategy.Timeouts.Add(1)
 				}
 				return
 			} else {
@@ -157,18 +157,18 @@ func (p *Reducer) fetchFromBackends(stragegy *TStrategy) chan *TResult {
 			}
 		}
 		if partial == nil {
-			stragegy.Fails.Add(1)
+			strategy.Fails.Add(1)
 			ch <- nil
 		} else {
-			stragegy.Partials.Add(1)
-			ch <- &TResult{stragegy: stragegy, data: partial}
+			strategy.Partials.Add(1)
+			ch <- &TResult{strategy: strategy, data: partial}
 		}
 	}()
 	return ch
 }
 
 func (p *Reducer) fetchAndReduce() error {
-	stra := p.stragegy
+	stra := p.strategy
 
 	if bss, ok := p.serverConf.Servers[stra.Copy]; ok {
 		b := bss.nextOne(nil) // 复制线上真实流量到测试机器
@@ -182,13 +182,13 @@ func (p *Reducer) fetchAndReduce() error {
 	stra.Hits.Add(1)
 	if stra.Cache != nil && stra.CacheTime > 0 {
 		if r, ok := stra.Cache.Get(p.req.cacheKey); ok {
-			p.result = &TResult{stragegy: stra, bytes: copyAndfixSeqId(r, p.seqId)}
+			p.result = &TResult{strategy: stra, bytes: copyAndfixSeqId(r, p.seqId)}
 			return nil
 		}
 	}
 
 	timeout := time.After(time.Millisecond * time.Duration(stra.Timeout))
-	selectedRetry := 1
+	selectedRetry := 0
 
 	// var selectedCh chan *TResult
 	selectedCh := p.fetchFromBackends(stra)

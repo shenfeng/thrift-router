@@ -49,8 +49,8 @@ def gen_hooks(thrift):
     # out = open(out, 'w')
     print template.render(names=names)
 
-def check_config(f):
 
+def check_config(f):
     import json
 
     # json.

@@ -1,5 +1,6 @@
 #! /bin/bash
 
+cp ~/workspace/engine/data.thrift .
 
 python gen_hooks.py --file data.thrift > hooks.go
 

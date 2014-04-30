@@ -176,21 +176,19 @@ func (s *Backend) markAsBroken() {
 
 func (ss TBackendServers) nextOne(prev *Backend) *Backend {
 
-	return ss[rand.Intn(len(ss))]
+	var min int64 = 100000
+	idx := 0
+	i := rand.Intn(len(ss))
+	limit := i + len(ss)
 
-	// var min int64 = 100000
-	// idx := 0
-	// i := rand.Intn(len(ss))
-	// limit := i + len(ss)
-
-	// for ; i < limit; i++ {
-	// 	s := ss[i%len(ss)]
-	// 	if s != prev && s.Dead.Get() == 0 && s.Ongoing.Get() < min {
-	// 		min = s.Ongoing.Get()
-	// 		idx = i % len(ss)
-	// 	}
-	// }
-	// return ss[idx]
+	for ; i < limit; i++ {
+		s := ss[i%len(ss)]
+		if s != prev && s.Dead.Get() == 0 && s.Ongoing.Get() < min {
+			min = s.Ongoing.Get()
+			idx = i % len(ss)
+		}
+	}
+	return ss[idx]
 }
 
 func (s *Backend) reAlive() {
