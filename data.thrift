@@ -55,6 +55,7 @@ struct JobProperty
     7: list<i32> industries, // 行业
     8: i32 companyId, // companyId in kanzhun
     9: i32 salary,
+    10: i32 score,
 }
 
 struct Jobs

@@ -2,7 +2,8 @@
 
 cp ~/workspace/engine/data.thrift .
 
-python gen_hooks.py --file data.thrift > hooks.go
+python gen_hooks.py --file data.thrift --mode gen-go > hooks.go
+python gen_hooks.py --file data.thrift --mode gen-java > clients.java
 
 rm -rf gen-go
 
