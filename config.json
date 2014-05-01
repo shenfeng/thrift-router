@@ -21,7 +21,7 @@
             "name": "strategy0",
             "timeout": 2000,
             "cache": 1024,
-            "cachetime": 1,
+            "cachetime": 240,
             "models": [
               "job_search",
               "job_search"
@@ -57,7 +57,7 @@
             "name": "strategy0",
             "timeout": 2000,
             "cache": 1024,
-            "cachetime": 120,
+            "cachetime": -1,
             "models": [
               "job_search",
               "job_search"
@@ -169,6 +169,24 @@
             "models": [
               "ac_server",
               "ac_server"
+            ]
+          }
+        ]
+      }
+    ],
+    "jobCategories": [
+      {
+        "filter": {},
+        "log": true,
+        "strategies": [
+          {
+            "name": "strategy0",
+            "timeout": 2000,
+            "cache": 1024,
+            "cachetime": 120,
+            "models": [
+              "job_search",
+              "job_search"
             ]
           }
         ]

@@ -9,7 +9,6 @@
                 client = pool.getClient(client);
                 {{s.resp}} resp = client.client.{{s.name}}({{s.arg.name}});
                 pool.returnClient(client);
-
                 return resp;
             } catch (TException e1) {
                 e = e1;

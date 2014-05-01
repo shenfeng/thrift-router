@@ -67,6 +67,8 @@ class ThriftService(object):
 
         if len(self.args) == 1:
             self.arg = self.args[0]
+        elif len(self.args) == 0:
+            self.arg = {'type': '', 'name': ''}
 
         self.resp = self.to_java_type(self.resp)
 
@@ -135,7 +137,7 @@ def gen_java_hooks():
     for ts in get_service_lines(args.file):
         ts.fname = rename.get(ts.name, ts.name)
 
-        if len(ts.args) == 1 and ts.name not in ('jobcount', 'findSimilaryJobs'):
+        if len(ts.args) <= 1 and ts.name not in ('jobcount', 'findSimilaryJobs'):
             services.append(ts)
 
             # print ts

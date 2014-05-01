@@ -18,10 +18,10 @@ func readThrift(input []byte, t TType) error {
 	return t.Read(prot)
 }
 
-func md5Sum(t TType) []byte {
-	oprot := thrift.NewTWBinaryProtocol(16 * 1024)
-	t.Write(oprot)
-	data := oprot.Bytes()
+func md5Sum(data []byte) []byte {
+	// oprot := thrift.NewTWBinaryProtocol(16 * 1024)
+	// t.Write(oprot)
+	// data := oprot.Bytes()
 
 	h := md5.New()
 	h.Write(data)
@@ -50,7 +50,7 @@ func (p *{{name}}Hook) DecodeReq(s *Server, input []byte, seqid int32) (*TReques
 		return &TRequest{
 			bytes: input,
 			obj: r,
-			cacheKey: fmt.Sprintf("{{lower}}-%x", md5Sum(r)),
+			cacheKey: fmt.Sprintf("{{lower}}-%x", md5Sum(input)),
 		}, nil
 	}
 }
