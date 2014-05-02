@@ -1,10 +1,11 @@
+# encoding: utf8
 __author__ = 'feng'
 
 import re
 from jinja2 import Template
 
 import argparse
-
+import datetime
 parser = argparse.ArgumentParser(description="Generate go src file")
 parser.add_argument('--file', type=str, default="data.thrift", help='Thrift definition file')
 parser.add_argument('--mode', type=str, default="gen-java", help='gen-go | gen-java | check')
@@ -26,6 +27,7 @@ class ThriftService(object):
         m = {
             'list<': 'List<',
             'i32': 'Integer',
+            'i64': 'Long',
             'string': 'String',
         }
 
@@ -141,8 +143,9 @@ def gen_java_hooks():
             services.append(ts)
 
             # print ts
-    java_template = Template(open('gen-java.tpl').read())
-    print java_template.render(services=services)
+    java_template = Template(open('gen-java.tpl').read().decode('utf8'))
+    print java_template.render(services=services,
+                               time=datetime.datetime.now()).encode('utf8')
 
 
 if __name__ == "__main__":
